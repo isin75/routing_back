@@ -71,6 +71,7 @@
         "@babel/register": "^7.17.7",
         "@babel/runtime": "^7.18.3",
         "@emotion/babel-plugin": "^11.9.2",
+        "axios": "^1.5.0",
         "babel-core": "7.0.0-bridge.0",
         "babel-eslint": "10.1.0",
         "babel-jest": "^28.1.1",
