@@ -1,149 +1,111 @@
-# SkillCrucial React Redux boilerplate
+Backend route (Node, Express, Axios)
 
-## Quick start
+This application receives data from the server, records it, and allows you to display, modify, delete.
 
-1. Clone this repo using:
-  ```shell
-  $ git clone git@github.com:ovasylenko/skillcrucial-react-redux-boilerplate.git
-  ```
+Functionality tested using Poster
 
-2. To install dependencies and clean the git repo run:
+Main application code: ./server/server.js
+Data from the server is saved in: ./server/data/users.json
 
-  ```shell
-  $ yarn install
-  ```
+Code:
 
-  *We recommend using `yarn` for installing packages, but you can use `npm` instead*:
+const getUsers = async () => {
+  try {
+    const text = await readFile(`${__dirname}/data/users.json`, { encoding: 'utf8' });
+    return JSON.parse(text);
+  } catch (error) {
+    const url = 'https://jsonplaceholder.typicode.com/users';
+    const { data } = await axios(url);
+    await writeFile(`${__dirname}/data/users.json`, JSON.stringify(data), { encoding: 'utf8' });
+    return data;
+  }
+}
 
-  ```shell
-  $ npm install
-  ```
-3. Create first build
+const addUser = async (newDataInList) => {
+    await writeFile(`${__dirname}/data/users.json`, JSON.stringify(newDataInList), { encoding: 'utf8' })
+} 
 
-  ```shell
-  $ yarn run build:prod
-  ```
-4. Copy .env.example file to .env and make the necessary changes there
+const headers = (req, res, next) => {
+  res.set('x-skillcrucial-user', '94817793-1099-40ca-99f6-b2a89a35ed74');  
+  res.set('Access-Control-Expose-Headers', 'X-SKILLCRUCIAL-USER')  
+  next()
+}
 
-5. Run project in Dev mode
+const middleware = [
+  cors(),
+  express.static(path.resolve(__dirname, '../dist')),
+  express.urlencoded({ limit: '50mb', extended: true, parameterLimit: 50000 }),
+  express.json({ limit: '50mb', extended: true }),
+  cookieParser(),
+  headers
+]
 
-  ```shell
-  $ yarn run dev
-  ```
+middleware.forEach((it) => server.use(it))
 
-## Features
+server.get('/', (req, res) => {
+  res.send(`
+    <h2>This is SkillCrucial Express Server!</h2>
+    <h3>Client hosted at <a href="http://localhost:8087">localhost:8087</a>!</h3>
+  `)
+})
 
-* Redux
-* Modern ES6 for using template strings, JSX syntax, object destructuring arrow functions and more
-* Babel for old browser support
-* SASS/SCSS: make styles greate again, with no tears
-* React Router
-* Hot Module Replacement for comfortable development
+server.get('/api/v1/users', async (req, res) => {
+  try {
+    const users = await getUsers()
+      res.json(users)
+  } catch (error) {
+      res.status(500).json({ status: 'error', message: 'Internal Server Error' })
+  }
+})
 
-## Project Structure
+server.post('/api/v1/users', async (req, res) => {
+  try {
+    const users = await getUsers()
+    const newUserData = req.body
+    const newId = users[users.length - 1].id + 1
+    const newUser = { id: newId, ...newUserData }
+    const newUserList = [...users, newUser]
+    await addUser(newUserList)
+    res.status(201).json({ status: 'success', id: newId })
+  } catch (error) {
+      res.status(500).json({ status: 'error', message: 'Internal Server Error' })
+  }
+})
 
-#### `client/`
+server.patch('/api/v1/users/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params
+    const newUserValue = req.body
+    const users = await getUsers()
+    const updateUser = users.map((user) => {
+      if (user.id === +userId) {
+        return { ...user, ...newUserValue}
+     }
+      return user
+    })
+    await addUser(updateUser)
+    res.json({ status: 'success', id: userId })
+  } catch (error) {
+      res.status(500).json({ status: 'error', message: 'Internal Server Error' })
+  }
+})
 
-You will write your app in this folder. You will spend most of your time in here.
+server.delete('/api/v1/users/:userIdToDelete', async (req, res) => {
+  try {
+    const { userIdToDelete } = req.params;
+    const users = await getUsers()
 
-#### `client/components`
+    const updatedUsers = users.filter((user) => user.id !== +userIdToDelete);
+    
+    await addUser(updatedUsers)
+    
+    res.json({ status: 'success', id: userIdToDelete });
+  } catch (error) {
+      res.status(500).json({ status: 'error', message: 'Internal Server Error' })
+  }
+})
 
-This folder contains all your components
-
-#### `dist/assets`
-This directory contains compiled project files
-
-#### `webpack.development.config.js` `and webpack.production.frontend.config.js`
-Project environment configs. Webpack uses proper config depending on defined application environment.
-By default `webpack.development.config.js` is used unless you build the application with --config webpack.production.frontend.config.js variable.
-
-
-## Command Line Commands
-
-#### Installation
-
-```Shell
-yarn install
-```
-Installs the dependencies.
-
-#### Development
-
-```Shell
-yarn run dev
-```
-
-Starts the development server running on `http://localhost:8080` using the webpack.development.config.js with Hot Module Replacement (HMR) (Changes in the application code will be hot-reloaded)
-
-```Shell
-yarn run dev:server
-```
-
-Starts the development server and makes your application accessible at http://localhost:8080.
-
-```Shell
-yarn run clean
-```
-Removes a directory "dist" from a project
-
-#### Building
-
-```Shell
-yarn build:prod
-```
-
-Prepares your app for deployment to production environment (using the webpack.production.frontend.config.js) (does not run tests). Optimizes and minifies all files, piping them to the `dist` folder.
-
-
-#### Testing
-
-```Shell
-yarn run test
-```
-
-Tests your application modern JavaScript Testing Framework - Jest with the unit tests specified in the `**/__tests__/*.spec.js` files
-throughout the application.
-
-```Shell
-yarn run test:watch
-```
-
-Watches changes to your application and re-runs tests whenever a file changes.
-
-```Shell
-yarn run coverage
-```
-
-Generates test coverage.
-
-
-It’s also possible to leave out the run in this command, each script can be executed with its name, e.g:
-yarn test:watch
-yarn test:coverage
-
-#### Linting
-
-```Shell
-yarn run lint
-```
-Will analyse your code for potential errors. Will check both: `./client/**/**.js` and `./server/**/**.js` files.
-Code linting is a type of static analysis that is frequently used to find problematic patterns or code that doesn’t adhere to certain style guidelines.
-
-
-```Shell
-yarn run lint:server
-```
-
-Will analyse only  `server/**/**.js` files
-
-#### Docker
-Nginx web server working on 443, 80 ports on localhost
-
-```run production
-docker-compose -f .\docker\PROD.docker-compose.yml up (Options: --build for build, -d to detach )
-docker-compose -f .\docker\PROD.docker-compose.yml down (To stop contaiters)
-```
-```run develop
-docker-compose -f .\docker\DEV.docker-compose.yml up (Options: --build for build, -d to detach )
-docker-compose -f .\docker\DEV.docker-compose.yml down (To stop contaiters)
-```
+server.delete('/api/v1/users', (req, res) => {
+  unlink(`${__dirname}/data/users.json`)
+  res.json({ status: 'deleted' })
+})
