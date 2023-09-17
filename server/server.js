@@ -18,6 +18,22 @@ let connections = []
 const port = process.env.PORT || 8090
 const server = express()
 
+const getUsers = async () => {
+  try {
+    const text = await readFile(`${__dirname}/data/users.json`, { encoding: 'utf8' });
+    return JSON.parse(text);
+  } catch (error) {
+    const url = 'https://jsonplaceholder.typicode.com/users';
+    const { data } = await axios(url);
+    await writeFile(`${__dirname}/data/users.json`, JSON.stringify(data), { encoding: 'utf8' });
+    return data;
+  }
+}
+
+const addUser = async (newDataInList) => {
+    await writeFile(`${__dirname}/data/users.json`, JSON.stringify(newDataInList), { encoding: 'utf8' })
+} 
+
 const headers = (req, res, next) => {
   res.set('x-skillcrucial-user', '94817793-1099-40ca-99f6-b2a89a35ed74');  
   res.set('Access-Control-Expose-Headers', 'X-SKILLCRUCIAL-USER')  
@@ -44,14 +60,7 @@ server.get('/', (req, res) => {
 
 server.get('/api/v1/users', async (req, res) => {
   try {
-    const users = await readFile(`${__dirname}/data/users.json`, { encoding: 'utf8' })
-      .then((text) => JSON.parse(text))
-      .catch(async () => {
-        const url = 'https://jsonplaceholder.typicode.com/users'
-        const { data } = await axios(url)
-        await writeFile(`${__dirname}/data/users.json`, JSON.stringify(data), { encoding: 'utf8' })
-        return data
-      })
+    const users = await getUsers()
       res.json(users)
   } catch (error) {
       res.status(500).json({ status: 'error', message: 'Internal Server Error' })
@@ -60,73 +69,54 @@ server.get('/api/v1/users', async (req, res) => {
 
 server.post('/api/v1/users', async (req, res) => {
   try {
-    const newUserData = req.body;
-    const users = await readFile(`${__dirname}/data/users.json`, { encoding: 'utf8' })
-      .then((text) => JSON.parse(text))
-      .catch(async () => {
-        const url = 'https://jsonplaceholder.typicode.com/users'
-        const { data } = await axios(url)
-        await writeFile(`${__dirname}/data/users.json`, JSON.stringify(data), { encoding: 'utf8' })
-        return data
-      });
-    
+    const users = await getUsers()
+    const newUserData = req.body
     const newId = users[users.length - 1].id + 1
     const newUser = { id: newId, ...newUserData }
     const newUserList = [...users, newUser]
-    
-    await writeFile(`${__dirname}/data/users.json`, JSON.stringify(newUserList), { encoding: 'utf8' })
-
+    await addUser(newUserList)
     res.status(201).json({ status: 'success', id: newId })
   } catch (error) {
-    res.status(500).json({ status: 'error', message: 'Internal Server Error' })
+      res.status(500).json({ status: 'error', message: 'Internal Server Error' })
   }
 })
 
 server.patch('/api/v1/users/:userId', async (req, res) => {
-  const { userId } = req.params
-  const newUserValue = req.body
-  const users = await readFile(`${__dirname}/data/users.json`, { encoding: 'utf-8' })
-    .then((text) => JSON.parse(text))
-    .catch(async () => {
-      const url = 'https://jsonplaceholder.typicode.com/users'
-      const { data } = await axios(url)
-      await writeFile(`${__dirname}/data/users.json`, JSON.stringify(data), { encoding: 'utf-8' })
-      return data
+  try {
+    const { userId } = req.params
+    const newUserValue = req.body
+    const users = await getUsers()
+    const updateUser = users.map((user) => {
+      if (user.id === +userId) {
+        return { ...user, ...newUserValue}
+     }
+      return user
     })
-  const updateUser = users.map((user) => {
-    if (user.id === +userId) {
-      return { ...user, ...newUserValue}
-    }
-    return user
-  })
-  await writeFile(`${__dirname}/data/users.json`, JSON.stringify(updateUser), { encoding: 'utf-8' })
-  .catch((err) => {
-    console.log(err)
-  })
-  res.json({ status: 'success', id: userId })
+    await addUser(updateUser)
+    res.json({ status: 'success', id: userId })
+  } catch (error) {
+      res.status(500).json({ status: 'error', message: 'Internal Server Error' })
+  }
 })
 
 server.delete('/api/v1/users/:userIdToDelete', async (req, res) => {
+  try {
     const { userIdToDelete } = req.params;
-    const users = await readFile(`${__dirname}/data/users.json`, { encoding: 'utf-8' })
-      .then((text) => JSON.parse(text))
-      .catch(async () => {
-        const url = 'https://jsonplaceholder.typicode.com/users';
-        const { data } = await axios(url);
-        await writeFile(`${__dirname}/data/users.json`, JSON.stringify(data), { encoding: 'utf-8' });
-        return data;
-      });
+    const users = await getUsers()
 
     const updatedUsers = users.filter((user) => user.id !== +userIdToDelete);
     
-    await writeFile(`${__dirname}/data/users.json`, JSON.stringify(updatedUsers), { encoding: 'utf-8' });
+    await addUser(updatedUsers)
     
     res.json({ status: 'success', id: userIdToDelete });
+  } catch (error) {
+      res.status(500).json({ status: 'error', message: 'Internal Server Error' })
+  }
 })
 
 server.delete('/api/v1/users', (req, res) => {
   unlink(`${__dirname}/data/users.json`)
-  res.send("Deleted")  
+  res.json({ status: 'deleted' })
 })
 
 server.get('/*', (req, res) => {
